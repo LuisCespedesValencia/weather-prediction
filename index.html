@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Predictor en vscode</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+    th, td { border: 1px solid #ccc; padding: 6px; font-size: 0.9em; text-align: center; }
+    th { background-color: #f0f0f0; }
+    .output-section { margin-top: 20px; }
+    #extrapolationGraph { width: 100%; }
+    #era5Table, #nasaTable { margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+
+<h3>Predictor</h3>
+
+<div id="map" style="width: 100%; height: 400px; margin-bottom: 10px;"></div>
+
+<form id="weatherForm">
+  <label>Fecha Inicio: <input type="date" id="startDate" required></label>
+  <label>Fecha Fin: <input type="date" id="endDate" required></label>
+      <label for="extrapolationDate">Extrapolación:<input type="date" id="extrapolationDate"></label>
+  <label>Periodo: 
+    <select id="period">
+      <option value="hora">Hora</option>
+      <option value="diario">Diario</option>
+      <option value="mensual">Mensual</option>
+      <option value="anual">Anual</option>
+    </select>
+  </label>
+  <label>Escenario: 
+    <select id="escenario">
+      <option value="normal">Normal</option>
+      <option value="pesimista">Pesimista</option>
+      <option value="optimista">Optimista</option>
+    </select>
+  </label>
+  <label>Grado Polinómico: 
+    <input type="number" id="gradoPolinomio" min="1" max="10" value="3">
+  </label>
+  <label>Tipo de Extrapolación: 
+    <select id="extrapolationType">
+      <option value="lineal">Lineal</option>
+      <option value="bilineal">Bilineal</option>
+      <option value="logaritmica">Logarítmica</option>
+      <option value="sinodal">Sinodal</option>
+      <option value="potencia">Potencia</option>
+      <option value="polinomica">Polinómica Grado n</option>
+      <option value="multivariante">Multivariante</option>
+    </select>
+  </label>
+  <button type="submit">Consultar</button>
+  <span id="gradoPolinomioContainer" style="display:none;">
+  <label>Grado Polinómico: 
+    <input type="number" id="gradoPolinomio" min="1" max="10" value="3">
+  </label>
+</span>
+         <div class="control-group">
+            <label for="tipo-suelo">World Reference Base for Soil Resources (WRB):</label>
+            <select id="tipo-suelo" name="tipo-suelo">
+              <option disabled selected>Seleccione un tipo de suelo</option>
+              <option value='{"nombre":"Volcánico suelto","cohesion":0.5,"densidad":1400,"friccion":10,"elasticidad":800,"Vs":150,"H":5,"f0":7.5,"permeabilidad":1e-3,"indice_plasticidad":0,"liquidez_limite":0,"compactacion_optima":0.8,"humedad_optima":15,"cbr":5,"modulo_young":2.4e6,"modulo_cortante":1.2e6,"relacion_poisson":0.2,"angulo_dilatancia":0,"factor_seguridad_min":1.2,"factor_seguridad_max":1.5,"susceptibilidad_licuefaccion":"Alta","susceptibilidad_expansion":"Baja","susceptibilidad_colapso":"alta"}'>volcanico suelto</option>
+              <option value='{"nombre":"Limo saturado","cohesion":5,"densidad":1600,"friccion":18,"elasticidad":1200,"Vs":180,"H":6,"f0":7.5,"permeabilidad":1e-5,"indice_plasticidad":15,"liquidez_limite":30,"compactacion_optima":0.9,"humedad_optima":20,"cbr":8,"modulo_young":3.6e6,"modulo_cortante":1.5e6,"relacion_poisson":0.2,"angulo_dilatancia":0,"factor_seguridad_min":1.3,"factor_seguridad_max":1.6,"susceptibilidad_licuefaccion":"Media","susceptibilidad_expansion":"Media","susceptibilidad_colapso":"Media"}'>Limo saturado</option>
+              <option value='{"nombre":"Arcilla blanda","cohesion":15,"densidad":1800,"friccion":25,"elasticidad":5000,"Vs":200,"H":10,"f0":5,"permeabilidad":1e-8,"indice_plasticidad":30,"liquidez_limite":50,"compactacion_optima":0.85,"humedad_optima":25,"cbr":3,"modulo_young":1.5e7,"modulo_cortante":5e6,"relacion_poisson":0.3,"angulo_dilatancia":0,"factor_seguridad_min":1.1,"factor_seguridad_max":1.4,"susceptibilidad_licuefaccion":"Baja","susceptibilidad_expansion":"Alta","susceptibilidad_colapso":"Baja"}'>Arcilla blanda</option>
+              <option value='{"nombre":"Arcilla consolidada","cohesion":10,"densidad":1900,"friccion":30,"elasticidad":8000,"Vs":250,"H":12,"f0":5.21,"permeabilidad":1e-9,"indice_plasticidad":25,"liquidez_limite":40,"compactacion_optima":0.95,"humedad_optima":20,"cbr":10,"modulo_young":2.4e7,"modulo_cortante":8e6,"relacion_poisson":0.3,"angulo_dilatancia":0,"factor_seguridad_min":1.4,"factor_seguridad_max":1.8,"susceptibilidad_licuefaccion":"Muy Baja","susceptibilidad_expansion":"Media","susceptibilidad_colapso":"Muy Baja"}'>Arcilla consolidada</option>
+              <option value='{"nombre":"Arena fina suelta","cohesion":0,"densidad":1700,"friccion":28,"elasticidad":4000,"Vs":180,"H":8,"f0":5.63,"permeabilidad":1e-4,"indice_plasticidad":0,"liquidez_limite":0,"compactacion_optima":0.8,"humedad_optima":10,"cbr":10,"modulo_young":1.2e7,"modulo_cortante":4e6,"relacion_poisson":0.25,"angulo_dilatancia":2,"factor_seguridad_min":1.2,"factor_seguridad_max":1.5,"susceptibilidad_licuefaccion":"Alta","susceptibilidad_expansion":"Muy Baja","susceptibilidad_colapso":"Media"}'>Arena fina suelta</option>
+              <option value='{"nombre":"Arena media densa","cohesion":2,"densidad":1750,"friccion":34,"elasticidad":9000,"Vs":220,"H":10,"f0":5.5,"permeabilidad":1e-3,"indice_plasticidad":0,"liquidez_limite":0,"compactacion_optima":0.95,"humedad_optima":12,"cbr":20,"modulo_young":2.7e7,"modulo_cortante":9e6,"relacion_poisson":0.25,"angulo_dilatancia":5,"factor_seguridad_min":1.5,"factor_seguridad_max":2.0,"susceptibilidad_licuefaccion":"Media","susceptibilidad_expansion":"Muy Baja","susceptibilidad_colapso":"Baja"}'>Arena media densa</option>
+              <option value='{"nombre":"Grava arcillosa","cohesion":5,"densidad":1850,"friccion":36,"elasticidad":15000,"Vs":260,"H":15,"f0":4.33,"permeabilidad":1e-6,"indice_plasticidad":10,"liquidez_limite":20,"compactacion_optima":0.92,"humedad_optima":18,"cbr":30,"modulo_young":4.5e7,"modulo_cortante":1.5e7,"relacion_poisson":0.3,"angulo_dilatancia":3,"factor_seguridad_min":1.6,"factor_seguridad_max":2.2,"susceptibilidad_licuefaccion":"Baja","susceptibilidad_expansion":"Media","susceptibilidad_colapso":"Baja"}'>Grava arcillosa</option>
+              <option value='{"nombre":"Roca alterada","cohesion":30,"densidad":2100,"friccion":40,"elasticidad":20000,"Vs":300,"H":20,"f0":3.75,"permeabilidad":1e-7,"indice_plasticidad":0,"liquidez_limite":0,"compactacion_optima":1.0,"humedad_optima":5,"cbr":50,"modulo_young":6.0e7,"modulo_cortante":2.0e7,"relacion_poisson":0.2,"angulo_dilatancia":0,"factor_seguridad_min":2.0,"factor_seguridad_max":3.0,"susceptibilidad_licuefaccion":"Muy Baja","susceptibilidad_expansion":"Muy Baja","susceptibilidad_colapso":"Muy Baja"}'>Roca alterada</option>
+              <option value='{"nombre":"Roca fracturada","cohesion":45,"densidad":2400,"friccion":42,"elasticidad":30000,"Vs":450,"H":28,"f0":4.02,"permeabilidad":1e-5,"indice_plasticidad":0,"liquidez_limite":0,"compactacion_optima":1.0,"humedad_optima":3,"cbr":80,"modulo_young":9.0e7,"modulo_cortante":3.0e7,"relacion_poisson":0.15,"angulo_dilatancia":0,"factor_seguridad_min":2.5,"factor_seguridad_max":4.0,"susceptibilidad_licuefaccion":"Muy Baja","susceptibilidad_expansion":"Muy Baja","susceptibilidad_colapso":"Muy Baja"}'>Roca fracturada</option>
+              <option value='{"nombre":"Material coluvial","cohesion":0,"densidad":1600,"friccion":15,"elasticidad":1000,"Vs":120,"H":4,"f0":7.5,"permeabilidad":1e-4,"indice_plasticidad":5,"liquidez_limite":10,"compactacion_optima":0.7,"humedad_optima":18,"cbr":4,"modulo_young":3.0e6,"modulo_cortante":1.0e6,"relacion_poisson":0.25,"angulo_dilatancia":0,"factor_seguridad_min":1.0,"factor_seguridad_max":1.3,"susceptibilidad_licuefaccion":"Alta","susceptibilidad_expansion":"Baja","susceptibilidad_colapso":"Alta"}'>Material coluvial</option>
+              <option value='{"nombre":"Arena limosa suelta","cohesion":1,"densidad":1500,"friccion":12,"elasticidad":1000,"Vs":140,"H":5,"f0":7.0,"permeabilidad":1e-4,"indice_plasticidad":2,"liquidez_limite":5,"compactacion_optima":0.75,"humedad_optima":16,"cbr":6,"modulo_young":3.0e6,"modulo_cortante":1.2e6,"relacion_poisson":0.25,"angulo_dilatancia":1,"factor_seguridad_min":1.1,"factor_seguridad_max":1.4,"susceptibilidad_licuefaccion":"Alta","susceptibilidad_expansion":"Baja","susceptibilidad_colapso":"Alta"}'>Arena limosa suelta</option>
+              <option value='{"nombre":"Limo arenoso saturado","cohesion":8,"densidad":1700,"friccion":20,"elasticidad":2500,"Vs":160,"H":7,"f0":6.43,"permeabilidad":1e-5,"indice_plasticidad":12,"liquidez_limite":25,"compactacion_optima":0.88,"humedad_optima":22,"cbr":9,"modulo_young":7.5e6,"modulo_cortante":2.5e6,"relacion_poisson":0.2,"angulo_dilatancia":0,"factor_seguridad_min":1.3,"factor_seguridad_max":1.6,"susceptibilidad_licuefaccion":"Media","susceptibilidad_expansion":"Media","susceptibilidad_colapso":"Media"}'>Limo arenoso saturado</option>
+              <option value='{"nombre":"Arcilla limosa blanda","cohesion":20,"densidad":1900,"friccion":28,"elasticidad":6000,"Vs":220,"H":11,"f0":5.0,"permeabilidad":1e-8,"indice_plasticidad":28,"liquidez_limite":45,"compactacion_optima":0.82,"humedad_optima":26,"cbr":4,"modulo_young":1.8e7,"modulo_cortante":6e6,"relacion_poisson":0.3,"angulo_dilatancia":0,"factor_seguridad_min":1.1,"factor_seguridad_max":1.4,"susceptibilidad_licuefaccion":"Baja","susceptibilidad_expansion":"Alta","susceptibilidad_colapso":"Baja"}'>Arcilla limosa blanda</option>
+              <option value='{"nombre":"Arcilla limosa consolidada","cohesion":12,"densidad":2000,"friccion":32,"elasticidad":9000,"Vs":280,"H":13,"f0":5.38,"permeabilidad":1e-9,"indice_plasticidad":22,"liquidez_limite":35,"compactacion_optima":0.94,"humedad_optima":21,"cbr":12,"modulo_young":2.7e7,"modulo_cortante":9e6,"relacion_poisson":0.3,"angulo_dilatancia":0,"factor_seguridad_min":1.4,"factor_seguridad_max":1.8,"susceptibilidad_licuefaccion":"Muy Baja","susceptibilidad_expansion":"Media","susceptibilidad_colapso":"Muy Baja"}'>Arcilla limosa consolidada</option>
+              <option value='{"nombre":"Arena gruesa suelta","cohesion":0,"densidad":1800,"friccion":30,"elasticidad":5000,"Vs":200,"H":9,"f0":5.56,"permeabilidad":1e-3,"indice_plasticidad":0,"liquidez_limite":0,"compactacion_optima":0.85,"humedad_optima":8,"cbr":15,"modulo_young":1.5e7,"modulo_cortante":5e6,"relacion_poisson":0.25,"angulo_dilatancia":3,"factor_seguridad_min":1.3,"factor_seguridad_max":1.6,"susceptibilidad_licuefaccion":"Media","susceptibilidad_expansion":"Muy Baja","susceptibilidad_colapso":"Baja"}'>Arena gruesa suelta</option>
+              <option value='{"nombre":"Arena gruesa densa","cohesion":3,"densidad":1850,"friccion":38,"elasticidad":10000,"Vs":240,"H":11,"f0":5.45,"permeabilidad":1e-2,"indice_plasticidad":0,"liquidez_limite":0,"compactacion_optima":0.96,"humedad_optima":10,"cbr":25,"modulo_young":3.0e7,"modulo_cortante":1.0e7,"relacion_poisson":0.25,"angulo_dilatancia":6,"factor_seguridad_min":1.6,"factor_seguridad_max":2.1,"susceptibilidad_licuefaccion":"Baja","susceptibilidad_expansion":"Muy Baja","susceptibilidad_colapso":"Muy Baja"}'>Arena gruesa densa</option>
+              <option value='{"nombre":"Grava arenosa","cohesion":7,"densidad":1950,"friccion":40,"elasticidad":16000,"Vs":280,"H":16,"f0":4.38,"permeabilidad":1e-4,"indice_plasticidad":5,"liquidez_limite":15,"compactacion_optima":0.93,"humedad_optima":15,"cbr":35,"modulo_young":4.8e7,"modulo_cortante":1.6e7,"relacion_poisson":0.3,"angulo_dilatancia":4,"factor_seguridad_min":1.7,"factor_seguridad_max":2.3,"susceptibilidad_licuefaccion":"Muy Baja","susceptibilidad_expansion":"Baja","susceptibilidad_colapso":"Muy Baja"}'>Grava arenosa</option>
+              <option value='{"nombre":"Roca sedimentaria alterada","cohesion":35,"densidad":2200,"friccion":42,"elasticidad":22000,"Vs":320,"H":22,"f0":3.64,"permeabilidad":1e-6,"indice_plasticidad":0,"liquidez_limite":0,"compactacion_optima":1.0,"humedad_optima":4,"cbr":60,"modulo_young":6.6e7,"modulo_cortante":2.2e7,"relacion_poisson":0.2,"angulo_dilatancia":0,"factor_seguridad_min":2.1,"factor_seguridad_max":3.2,"susceptibilidad_licuefaccion":"Muy Baja","susceptibilidad_expansion":"Muy Baja","susceptibilidad_colapso":"Muy Baja"}'>Roca sedimentaria alterada</option>
+              <option value='{"nombre":"Roca metamórfica fracturada","cohesion":50,"densidad":2500,"friccion":45,"elasticidad":35000,"Vs":450,"H":28,"f0":4.02,"permeabilidad":1e-5,"indice_plasticidad":0,"liquidez_limite":0,"compactacion_optima":1.0,"humedad_optima":2,"cbr":90,"modulo_young":1.05e8,"modulo_cortante":3.5e7,"relacion_poisson":0.15,"angulo_dilatancia":0,"factor_seguridad_min":2.6,"factor_seguridad_max":4.5,"susceptibilidad_licuefaccion":"Muy Baja","susceptibilidad_expansion":"Muy Baja","susceptibilidad_colapso":"Muy Baja"}'>Roca metamórfica fracturada</option>
+              <option value='{"nombre":"Depósitos aluviales sueltos","cohesion":0,"densidad":1550,"friccion":14,"elasticidad":1100,"Vs":130,"H":4.5,"f0":7.22,"permeabilidad":1e-4,"indice_plasticidad":5,"liquidez_limite":10,"compactacion_optima":0.7,"humedad_optima":18,"cbr":4,"modulo_young":3.3e6,"modulo_cortante":1.1e6,"relacion_poisson":0.25,"angulo_dilatancia":0,"factor_seguridad_min":1.0,"factor_seguridad_max":1.3,"susceptibilidad_licuefaccion":"Alta","susceptibilidad_expansion":"Baja","susceptibilidad_colapso":"Alta"}'>Depósitos aluviales sueltos</option>
+              <option value='{"nombre":"Turba y suelos orgánicos saturados","cohesion":6,"densidad":1700,"friccion":22,"elasticidad":2800,"Vs":170,"H":7.5,"f0":6.0,"permeabilidad":1e-6,"indice_plasticidad":40,"liquidez_limite":80,"compactacion_optima":0.6,"humedad_optima":50,"cbr":1,"modulo_young":8.4e6,"modulo_cortante":2.8e6,"relacion_poisson":0.35,"angulo_dilatancia":0,"factor_seguridad_min":0.9,"factor_seguridad_max":1.2,"susceptibilidad_licuefaccion":"Baja","susceptibilidad_expansion":"Media","susceptibilidad_colapso":"Alta"}'>Turba y suelos orgánicos saturados</option>
+              <option value='{"nombre":"Marga blanda","cohesion":18,"densidad":1850,"friccion":26,"elasticidad":5500,"Vs":210,"H":10.5,"f0":5.24,"permeabilidad":1e-7,"indice_plasticidad":25,"liquidez_limite":40,"compactacion_optima":0.8,"humedad_optima":22,"cbr":5,"modulo_young":1.65e7,"modulo_cortante":5.5e6,"relacion_poisson":0.3,"angulo_dilatancia":0,"factor_seguridad_min":1.2,"factor_seguridad_max":1.5,"susceptibilidad_licuefaccion":"Baja","susceptibilidad_expansion":"Media","susceptibilidad_colapso":"Baja"}'>Marga blanda</option>
+              <option value='{"nombre":"Marga consolidada","cohesion":14,"densidad":1950,"friccion":31,"elasticidad":8500,"Vs":260,"H":12.5,"f0":5.2,"permeabilidad":1e-8,"indice_plasticidad":20,"liquidez_limite":35,"compactacion_optima":0.9,"humedad_optima":18,"cbr":11,"modulo_young":2.55e7,"modulo_cortante":8.5e6,"relacion_poisson":0.3,"angulo_dilatancia":0,"factor_seguridad_min":1.5,"factor_seguridad_max":1.9,"susceptibilidad_licuefaccion":"Muy Baja","susceptibilidad_expansion":"Media","susceptibilidad_colapso":"Muy Baja"}'>Marga consolidada</option>
+              <option value='{"nombre":"Loess suelto","cohesion":0,"densidad":1650,"friccion":25,"elasticidad":3500,"Vs":170,"H":7.5,"f0":5.67,"permeabilidad":1e-5,"indice_plasticidad":0,"liquidez_limite":0,"compactacion_optima":0.75,"humedad_optima":12,"cbr":8,"modulo_young":1.05e7,"modulo_cortante":3.5e6,"relacion_poisson":0.25,"angulo_dilatancia":0,"factor_seguridad_min":1.1,"factor_seguridad_max":1.4,"susceptibilidad_licuefaccion":"Media","susceptibilidad_expansion":"Muy Baja","susceptibilidad_colapso":"Alta"}'>Loess suelto</option>
+              <option value='{"nombre":"Loess colapsable (seco)","cohesion":4,"densidad":1750,"friccion":36,"elasticidad":9500,"Vs":230,"H":10.5,"f0":5.48,"permeabilidad":1e-6,"indice_plasticidad":5,"liquidez_limite":10,"compactacion_optima":0.85,"humedad_optima":10,"cbr":15,"modulo_young":2.85e7,"modulo_cortante":9.5e6,"relacion_poisson":0.25,"angulo_dilatancia":0,"factor_seguridad_min":1.4,"factor_seguridad_max":1.7,"susceptibilidad_licuefaccion":"Muy Baja","susceptibilidad_expansion":"Baja","susceptibilidad_colapso":"Muy Alta"}'>Loess colapsable (seco)</option>
+            </select>
+        </div>
+    </div>
+
+</form>
+
+<h3>Tabla ERA5</h3>
+<div id="era5Table"></div>
+
+<h3>Tabla NASA</h3>
+<div id="nasaTable"></div>
+
+<h3>Tabla Promedios</h3>
+<div id="tablaPromedios"></div>
+
+<h3>Tabla de Extrapolación (VAR)</h3>
+<div id="tablaExtrapolacion"></div>
+
+<h3>Gráfico NASA</h3>
+<div id="plot-nasa" style="height:400px;"></div>
+
+<h3>Gráfico ERA5</h3>
+<div id="plot-era5" style="height:400px;"></div>
+
+<h3>Comparación Normalizada</h3>
+<div id="plot-comparison" style="height:400px;"></div>
+
+<h3>Extrapolación VAR</h3>
+<div id="graficoExtrapolacion" style="height:400px;"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
+<script>
+    // Variables globales para el mapa y control de inicialización
+let map = null;
+let mapInitialized = false;
+let selectedLat = null;
+let selectedLon = null;
+let resumenPromediosGlobal = [];
+
+// Inicializa el mapa solo una vez
+function initializeMap() {
+    if (mapInitialized) return;
+    map = L.map('map').setView([4.6, -74.1], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    map.on('click', function (e) {
+        selectedLat = e.latlng.lat.toFixed(4);
+        selectedLon = e.latlng.lng.toFixed(4);
+        alert(`Ubicación seleccionada:\nLatitud: ${selectedLat}, Longitud: ${selectedLon}`);
+    });
+
+    mapInitialized = true;
+}
+
+// Función para calcular promedios
+function calcularPromedios(data1, data2, key) {
+    return data1.map((row, idx) => {
+        const row2 = data2.find(n => n.time === row.time);
+        if (row2) {
+            const val1 = parseFloat(row[key]);
+            const val2 = parseFloat(row2[key]);
+            return (isFinite(val1) && isFinite(val2)) ? ((val1 + val2) / 2).toFixed(3) : row[key];
+        }
+        return row[key];
+    });
+}
+
+// Función para formatear fechas
+function formatDateForExtrapolacionSummary(date) {
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+        return '';
+    }
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function computeFFT(data) {
+    const N = data.length;
+    const re = new Array(N).fill(0);
+    const im = new Array(N).fill(0);
+
+    for (let k = 0; k < N; k++) {
+        for (let n = 0; n < N; n++) {
+            const angle = (2 * Math.PI * k * n) / N;
+            re[k] += data[n] * Math.cos(angle);
+            im[k] -= data[n] * Math.sin(angle);
+        }
+    }
+
+    const magnitudes = re.map((r, i) => Math.sqrt(r * r + im[i] * im[i]));
+
+    let peakIndex = 0;
+    let maxMagnitude = 0;
+    const minMeaningfulFreqIndex = 1;
+    const maxMeaningfulFreqIndex = Math.floor(N / 2);
+
+    for (let i = minMeaningfulFreqIndex; i <= maxMeaningfulFreqIndex; i++) {
+        if (magnitudes[i] > maxMagnitude) {
+            maxMagnitude = magnitudes[i];
+            peakIndex = i;
+        }
+    }
+
+    if (peakIndex === 0) {
+        return { dominantPeriod: N, wavelength: N, peakMagnitude: 0, peakFrequency: 0 };
+    }
+
+    const dominantPeriod = N / peakIndex;
+    const wavelength = (2 * Math.PI) / peakIndex;
+
+    return { dominantPeriod, wavelength, peakMagnitude: maxMagnitude, peakFrequency: peakIndex / N };
+}
+
+function timeAsWavelength(s, wavelength) {
+    if (wavelength === 0) return 0;
+    return (2 * Math.PI / wavelength) * s;
+}
+
+function synodalModel(s, wavelength) {
+    if (wavelength === 0) return 0;
+    const x = timeAsWavelength(s, wavelength);
+    return 0.5 * Math.sin(2 * x);
+}
+
+function sensitivityAnalysis(data, modelFunc, wavelengthRange, modelParams = {}) {
+    if (!data || data.length === 0 || !wavelengthRange || wavelengthRange.length === 0) return [];
+
+    return wavelengthRange.map(wavelength => {
+        const predictions = data.map((_, s) => {
+            if (modelFunc === synodalModel) {
+                return modelFunc(s, wavelength);
+            }
+            return 0;
+        });
+
+        if (predictions.length === 0) return { wavelength, error: Infinity };
+
+        const error = predictions.reduce((sum, pred, i) => sum + Math.abs(pred - data[i]), 0) / predictions.length;
+        return { wavelength, error };
+    });
+}
+
+function clipValue(value, min, max) {
+    return Math.max(min, Math.min(value, max));
+}
+
+function isValid(value) {
+    return value !== null && value !== -999 && value !== 999 && value !== undefined && value !== '';
+}
+
+function getPeriodKey(time, period) {
+    const date = new Date(time);
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(date.getUTCDate()).padStart(2, '0');
+
+    if (period === 'diario') return `${y}-${m}-${d}`;
+    if (period === 'mensual') return `${y}-${m}`;
+    if (period === 'anual') return `${y}`;
+    return time;
+}
+
+function groupByPeriodAverage(data, keys, period) {
+    const grouped = {};
+    data.forEach(row => {
+        const key = getPeriodKey(row.time, period);
+        if (!grouped[key]) {
+            grouped[key] = { count: 0 };
+            keys.forEach(k => grouped[key][k] = 0);
+        }
+        keys.forEach(k => {
+            if (isValid(row[k])) {
+                grouped[key][k] += parseFloat(row[k]);
+            }
+        });
+        grouped[key].count++;
+    });
+
+    const result = [];
+    for (const [time, values] of Object.entries(grouped)) {
+        const row = { time };
+        keys.forEach(k => {
+            const avg = values.count > 0 ? values[k] / values.count : undefined;
+            row[k] = (typeof avg === 'number' && isFinite(avg)) ? avg.toFixed(2) : '';
+        });
+        result.push(row);
+    }
+    return result;
+}
+
+function renderTable(containerId, headers, dataArray) {
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.error(`Contenedor con ID "${containerId}" no encontrado.`);
+        return;
+    }
+    if (!dataArray || dataArray.length === 0) {
+        container.innerHTML = "<p>Sin datos válidos para mostrar.</p>";
+        return;
+    }
+
+    let html = '<table><thead><tr>';
+    headers.forEach(h => {
+        html += `<th>${h}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+
+    dataArray.forEach(row => {
+        html += '<tr>';
+        headers.forEach(h => {
+            html += `<td>${row[h] ?? ''}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function normalizeData(data, keys) {
+    if (!data || data.length === 0) return [];
+
+    const mins = {};
+    const maxs = {};
+
+    keys.forEach(key => {
+        const values = data.map(d => parseFloat(d[key])).filter(isFinite);
+        if (values.length > 0) {
+            mins[key] = Math.min(...values);
+            maxs[key] = Math.max(...values);
+        } else {
+            mins[key] = 0;
+            maxs[key] = 1;
+        }
+    });
+
+    // Imprimir los valores mínimos y máximos para depuración
+    console.log("Mins:", mins);
+    console.log("Maxs:", maxs);
+
+    return data.map(row => {
+        const newRow = { time: row.time };
+        keys.forEach(key => {
+            const val = parseFloat(row[key]);
+            if (isFinite(val)) {
+                if (maxs[key] === mins[key]) {
+                    newRow[key] = row[key] !== undefined ? row[key] : '0.000';
+                } else {
+                    newRow[key] = ((val - mins[key]) / (maxs[key] - mins[key])).toFixed(3);
+                }
+            } else {
+                newRow[key] = null;
+            }
+        });
+        return newRow;
+    });
+}
+
+function normalizeDataZ(data) {
+    if (!data || data.length === 0 || !data[0]) return [];
+
+    const keys = Object.keys(data[0]).filter(k => k !== 'time' && typeof data[0][k] !== 'function');
+    const means = {};
+    const stds = {};
+    const sourceDataForStats = {};
+
+    keys.forEach(key => {
+        const vals = data.map(d => parseFloat(d[key])).filter(isFinite);
+        sourceDataForStats[key] = vals;
+        if (vals.length > 0) {
+            means[key] = vals.reduce((a, b) => a + b, 0) / vals.length;
+            if (vals.length > 1) {
+                stds[key] = Math.sqrt(vals.reduce((a, b) => a + Math.pow(b - means[key], 2), 0) / (vals.length - 1));
+            } else {
+                stds[key] = 0;
+            }
+        } else {
+            means[key] = 0;
+            stds[key] = 1;
+        }
+    });
+
+    return data.map(record => {
+        const normalized = {};
+        keys.forEach(key => {
+            const value = parseFloat(record[key]);
+            if (isFinite(value)) {
+                normalized[key] = stds[key] !== 0 ? (value - means[key]) / stds[key] : 0;
+            } else {
+                normalized[key] = 0;
+            }
+        });
+        return normalized;
+    });
+}
+
+function calculateCorrelationMatrix(data) {
+    if (!data || data.length === 0 || !data[0]) return [];
+
+    const keys = Object.keys(data[0]).filter(k => k !== 'time' && typeof data[0][k] !== 'function');
+    const matrix = [];
+
+    keys.forEach((k1, i) => {
+        matrix[i] = [];
+        keys.forEach((k2, j) => {
+            const series1 = data.map(d => parseFloat(d[k1])).filter(isFinite);
+            const series2 = data.map(d => parseFloat(d[k2])).filter(isFinite);
+
+            matrix[i][j] = (series1.length === series2.length && series1.length > 0) ? calculateCorrelation(series1, series2) : 0;
+        });
+    });
+    return matrix;
+}
+
+function calculateCorrelation(x, y) {
+    const n = x.length;
+    if (n === 0) return 0;
+
+    const meanX = x.reduce((a, b) => a + b, 0) / n;
+    const meanY = y.reduce((a, b) => a + b, 0) / n;
+
+    const num = x.reduce((sum, xi, i) => sum + (xi - meanX) * (y[i] - meanY), 0);
+    const den = Math.sqrt(x.reduce((sum, xi) => sum + Math.pow(xi - meanX, 2), 0) * y.reduce((sum, yi) => sum + Math.pow(yi - meanY, 2), 0));
+
+    return den === 0 ? 0 : num / den;
+}
+
+function fitVAR(data, p) {
+    const X = [];
+    const Y = [];
+
+    for (let t = p; t < data.length; t++) {
+        let xRow = [];
+        for (let i = 1; i <= p; i++) {
+            xRow = xRow.concat(data[t - i]);
+        }
+        X.push(xRow);
+        Y.push(data[t]);
+    }
+
+    if (X.length === 0 || Y.length === 0) {
+        throw new Error("No hay suficiente data para VAR, asegúrese de tener al menos 'p+1' puntos de datos.");
+    }
+
+    try {
+        const X_t = numeric.transpose(X);
+        const XtX = numeric.dot(X_t, X);
+
+        if (numeric.det(XtX) === 0) {
+            throw new Error("Matriz singular en fitVAR. Posiblemente datos colineales o insuficientes.");
+        }
+
+        const XtX_inv = numeric.inv(XtX);
+        const XtY = numeric.dot(X_t, Y);
+        const coefficients = numeric.dot(XtX_inv, XtY);
+        return coefficients;
+    } catch (e) {
+        console.error("Error en numeric.js (fitVAR):", e);
+        throw e;
+    }
+}
+
+function predictVAR(model, data, p, steps) {
+    let predictions = [];
+    let lastValues = data.slice(-p);
+
+    for (let i = 0; i < steps; i++) {
+        let x = [];
+        for (let j = 0; j < p; j++) {
+            x = x.concat(lastValues[lastValues.length - p + j]);
+        }
+
+        const pred = numeric.dot(x, model);
+        predictions.push(pred);
+
+        lastValues.push(pred);
+        lastValues.shift();
+    }
+    return predictions;
+}
+
+function calculateRMSE(actual, predicted) {
+    const n = actual.length;
+    if (n === 0 || !predicted || predicted.length !== n) return NaN;
+
+    let sum = 0;
+    for (let i = 0; i < n; i++) {
+        if (typeof actual[i] === 'number' && typeof predicted[i] === 'number') {
+            sum += Math.pow(actual[i] - predicted[i], 2);
+        } else {
+            console.warn(`Valores no numéricos encontrados en RMSE: actual[${i}]=${actual[i]}, predicted[${i}]=${predicted[i]}`);
+            return NaN;
+        }
+    }
+    return Math.sqrt(sum / n);
+}
+
+function validateModel(data, model, p) {
+    if (data.length <= p) {
+        console.warn("No hay suficientes datos para validar el modelo VAR.");
+        return;
+    }
+
+    const actual = data.slice(p);
+    const predicted = predictVAR(model, data.slice(0, data.length), p, actual.length);
+
+    if (actual.length > 0 && predicted.length === actual.length && actual[0] && actual[0].length > 0) {
+        for (let i = 0; i < actual[0].length; i++) {
+            const actualSeries = actual.map(d => d[i]);
+            const predictedSeries = predicted.map(p => p[i]);
+            const rmse = calculateRMSE(actualSeries, predictedSeries);
+            const variableName = ['Temperatura', 'Precipitación', 'Viento'][i] || `Variable ${i + 1}`;
+            console.log(`RMSE (${variableName}): ${rmse ? rmse.toFixed(4) : 'N/A'}`);
+        }
+    } else {
+        console.warn("No se pudo calcular RMSE para la validación del modelo.");
+    }
+}
+
+function plotResultsVAR(actualData, predictedData, ultimaFecha, period) {
+    const variables = ["temperature", "precipitation", "windspeed"];
+    const traces = [];
+
+    variables.forEach(variable => {
+        traces.push({
+            x: actualData.map(d => d.time),
+            y: actualData.map(d => parseFloat(d[variable])),
+            mode: 'lines+markers',
+            name: `${variable.charAt(0).toUpperCase() + variable.slice(1)} (Actual)`,
+            yaxis: variable === 'temperature' ? 'y1' : (variable === 'precipitation' ? 'y2' : 'y3'),
+            line: { color: variable === 'temperature' ? 'red' : (variable === 'precipitation' ? 'blue' : 'green') }
+        });
+    });
+
+    variables.forEach(variable => {
+        const xPred = [];
+        for (let i = 0; i < predictedData.length; i++) {
+            const fechaExtrapolada = addPeriodToDate(new Date(ultimaFecha), period, i + 1);
+            const fechaStr = period === 'hora' ? fechaExtrapolada.toISOString().slice(0, 13) + ':00' : fechaExtrapolada.toISOString().slice(0, 10);
+            xPred.push(fechaStr);
+        }
+
+        traces.push({
+            x: xPred,
+            y: predictedData.map(d => parseFloat(d[variable])),
+            mode: 'lines+markers',
+            name: `${variable.charAt(0).toUpperCase() + variable.slice(1)} (Predicción VAR)`,
+            yaxis: variable === 'temperature' ? 'y1' : (variable === 'precipitation' ? 'y2' : 'y3'),
+            line: { color: variable === 'temperature' ? 'red' : (variable === 'precipitation' ? 'blue' : 'green'), dash: 'dot' }
+        });
+    });
+
+    const layout = {
+        title: "Extrapolación Multivariante (VAR) - Temperatura, Precipitación, Viento",
+        xaxis: { title: 'Fecha', tickangle: -45 },
+        yaxis: { title: 'Temperatura (°C)', titlefont: { color: 'red' }, tickfont: { color: 'red' } },
+        yaxis2: { title: 'Precipitación (mm)', titlefont: { color: 'blue' }, tickfont: { color: 'blue' }, overlaying: 'y', side: 'right', anchor: 'x', position: 1 },
+        yaxis3: { title: 'Viento (m/s)', titlefont: { color: 'green' }, tickfont: { color: 'green' }, overlaying: 'y', side: 'right', anchor: 'free', position: 1.1, showgrid: false },
+        margin: { t: 50, r: 120, b: 100 },
+        legend: { x: 1.25, xanchor: 'left', y: 1 }
+    };
+
+    Plotly.newPlot('graficoExtrapolacion', traces, layout);
+}
+
+function plotDataNasa(data) {
+    const times = data.map(d => d.time);
+    const traces = [
+        { x: times, y: data.map(d => parseFloat(d.temperature)), type: 'scatter', mode: 'lines', name: 'Temperatura (°C)' },
+        { x: times, y: data.map(d => parseFloat(d.precipitation)), type: 'scatter', mode: 'lines', name: 'Precipitación (mm)' },
+        { x: times, y: data.map(d => parseFloat(d.windspeed)), type: 'scatter', mode: 'lines', name: 'Viento (m/s)' }
+    ];
+    Plotly.newPlot('plot-nasa', traces, { title: 'NASA POWER' });
+}
+
+function plotDataEra5(data) {
+    const times = data.map(d => d.time);
+    const traces = [
+        { x: times, y: data.map(d => parseFloat(d.temperature)), type: 'scatter', mode: 'lines', name: 'Temperatura (°C)' },
+        { x: times, y: data.map(d => parseFloat(d.precipitation)), type: 'scatter', mode: 'lines', name: 'Precipitación (mm)' },
+        { x: times, y: data.map(d => parseFloat(d.windspeed)), type: 'scatter', mode: 'lines', name: 'Viento (m/s)' }
+    ];
+    Plotly.newPlot('plot-era5', traces, { title: 'ERA5 Open-Meteo' });
+}
+
+function plotComparisonNormalized(eraData, nasaData) {
+    if ((!eraData || eraData.length === 0) || (!nasaData || nasaData.length === 0)) {
+        Plotly.purge('plot-comparison');
+        return;
+    }
+
+    const eraKeys = ['temperature', 'precipitation', 'windspeed'];
+    const nasaKeys = ['temperature', 'precipitation', 'windspeed'];
+
+    const normalizedEraData = normalizeData(eraData, eraKeys);
+    const normalizedNasaData = normalizeData(nasaData, nasaKeys);
+
+    const timesEra = normalizedEraData.map(d => d.time);
+    const timesNasa = normalizedNasaData.map(d => d.time);
+
+    const commonTimes = timesEra.filter(t => timesNasa.includes(t));
+
+    if (commonTimes.length === 0) {
+        Plotly.purge('plot-comparison');
+        return;
+    }
+
+    const getValues = (dataset, key) => {
+        return commonTimes.map(t => {
+            const entry = dataset.find(d => d.time === t);
+            return entry ? parseFloat(entry[key]) : null;
+        }).filter(val => val !== null);
+    };
+
+    const traces = [
+        { x: commonTimes, y: getValues(normalizedEraData, 'temperature'), mode: 'lines', name: 'Temp ERA5 (norm)' },
+        { x: commonTimes, y: getValues(normalizedNasaData, 'temperature'), mode: 'lines', name: 'Temp NASA (norm)' },
+        { x: commonTimes, y: getValues(normalizedEraData, 'precipitation'), mode: 'lines', name: 'Precip ERA5 (norm)', line: { dash: 'dot' } },
+        { x: commonTimes, y: getValues(normalizedNasaData, 'precipitation'), mode: 'lines', name: 'Precip NASA (norm)', line: { dash: 'dot' } },
+        { x: commonTimes, y: getValues(normalizedEraData, 'windspeed'), mode: 'lines', name: 'Viento ERA5 (norm)', line: { dash: 'dashdot' } },
+        { x: commonTimes, y: getValues(normalizedNasaData, 'windspeed'), mode: 'lines', name: 'Viento NASA (norm)', line: { dash: 'dashdot' } }
+    ];
+
+    Plotly.newPlot('plot-comparison', traces, { title: 'Comparación Normalizada ERA5 vs NASA' });
+}
+
+function normalizeTime(str) {
+    const date = new Date(str);
+    if (isNaN(date.getTime())) {
+        return str;
+    }
+    return date.toISOString().slice(0, 13) + ":00";
+}
+
+function getPeriodStep(period) {
+    switch (period) {
+        case 'hora': return 1 / 24;
+        case 'diario': return 1;
+        case 'mensual': return 30;
+        case 'anual': return 365;
+        default: return 1;
+    }
+}
+
+function addPeriodToDate(date, period, steps) {
+    const d = new Date(date);
+    switch (period) {
+        case 'hora':
+            d.setHours(d.getHours() + steps);
+            break;
+        case 'diario':
+            d.setDate(d.getDate() + steps);
+            break;
+        case 'mensual':
+            d.setMonth(d.getMonth() + steps);
+            break;
+        case 'anual':
+            d.setFullYear(d.getFullYear() + steps);
+            break;
+        default:
+            d.setDate(d.getDate() + steps);
+    }
+    return d;
+}
+
+function ajustarLineal(x, y) {
+    const n = x.length;
+    if (n === 0) {
+        return { predict: () => 0, getSlopeAtEnd: () => 0 };
+    }
+
+    const sumX = x.reduce((a, b) => a + b, 0);
+    const sumY = y.reduce((a, b) => a + b, 0);
+    const sumXY = x.reduce((acc, xi, i) => acc + xi * y[i], 0);
+    const sumXX = x.reduce((acc, xi) => acc + xi * xi, 0);
+
+    const denominator = (n * sumXX - sumX * sumX);
+    const slope = denominator === 0 ? 0 : (n * sumXY - sumX * sumY) / denominator;
+    const intercept = (sumY - slope * sumX) / n;
+
+    return {
+        predict: t => slope * t + intercept,
+        getSlopeAtEnd: () => slope
+    };
+}
+
+function ajustarLogaritmica(x, y) {
+    if (x.some(val => val <= 0)) {
+        console.warn("Valores de X no positivos para ajuste logarítmico, usando ajuste lineal como fallback.");
+        return ajustarLineal(x, y);
+    }
+
+    const logX = x.map(v => Math.log(v));
+    const { predict: linearPredict, getSlopeAtEnd: getLinearSlopeAtEnd } = ajustarLineal(logX, y);
+
+    return {
+        predict: t => linearPredict(Math.log(t)),
+        getSlopeAtEnd: (tEnd = x.length - 1) => {
+            if (x.length < 2) return 0;
+            const m = getLinearSlopeAtEnd();
+            return m / x[tEnd];
+        }
+    };
+}
+
+function ajustarSinusoidal(x, y, dominantWavelength, period) {
+    const N = x.length;
+    if (N === 0) {
+        return { predict: () => 0, getSlopeAtEnd: () => 0 };
+    }
+
+    const step = getPeriodStep(period);
+
+    let wavelength = dominantWavelength;
+    if (!wavelength || isNaN(wavelength) || wavelength <= 0) {
+        wavelength = N * step / 2;
+        console.warn("Longitud de onda dominante no válida o no proporcionada. Estimando en:", wavelength);
+        if (wavelength === 0) {
+            return ajustarLineal(x,y);
+        }
+    }
+
+    const C = y.reduce((sum, val) => sum + val, 0) / N;
+    const A_est = (Math.max(...y) - Math.min(...y)) / 2;
+    const omega = (2 * Math.PI) / wavelength;
+
+    let closestIndex = 0;
+    let minDiff = Infinity;
+    for (let i = 0; i < N; i++) {
+        if (Math.abs(y[i] - C) < minDiff) {
+            minDiff = Math.abs(y[i] - C);
+            closestIndex = i;
+        }
+    }
+    let phi = -omega * (closestIndex * step);
+
+    return {
+        predict: t => {
+            const tReal = t * step;
+            return A_est * Math.sin(omega * tReal + phi) + C;
+        },
+        getSlopeAtEnd: (tEnd = x.length - 1) => {
+            const tReal = tEnd * step;
+            return A_est * omega * Math.cos(omega * tReal + phi);
+        }
+    };
+}
+
+function ajustarPolinomio(x, y, grado = 3) {
+    if (x.length <= grado) {
+        console.warn("Número de puntos insuficiente para el grado del polinomio, ajustando linealmente.");
+        return ajustarLineal(x, y);
+    }
+
+    const X = [];
+    for (let i = 0; i < x.length; i++) {
+        const row = [];
+        for (let j = 0; j <= grado; j++) {
+            row.push(Math.pow(x[i], j));
+        }
+        X.push(row);
+    }
+
+    try {
+        const Xt = numeric.transpose(X);
+        const XtX = numeric.dot(Xt, X);
+
+        if (numeric.det(XtX) === 0) {
+            console.warn("Matriz X'X singular para ajuste polinómico, ajustando linealmente.");
+            return ajustarLineal(x, y);
+        }
+
+        const XtY = numeric.dot(Xt, y);
+        const coef = numeric.solve(XtX, XtY);
+
+        return {
+            predict: t => coef.reduce((acc, c, i) => acc + c * Math.pow(t, i), 0),
+            getSlopeAtEnd: (tEnd = x.length - 1) => {
+                let derivative = 0;
+                for (let i = 1; i <= grado; i++) {
+                    derivative += i * coef[i] * Math.pow(tEnd, i - 1);
+                }
+                return derivative;
+            }
+        };
+    } catch (e) {
+        console.error("Error en numeric.js durante el ajuste polinómico:", e);
+        return ajustarLineal(x, y);
+    }
+}
+
+function ajustarPotencia(x, y) {
+    if (x.some(val => val <= 0) || y.some(val => val <= 0)) {
+        console.warn("Valores no positivos para ajuste de potencia, usando ajuste lineal como fallback.");
+        return ajustarLineal(x, y);
+    }
+
+    const logX = x.map(v => Math.log(v));
+    const logY = y.map(v => Math.log(v));
+
+    const { predict: linearPredict, getSlopeAtEnd: getLinearSlopeAtEnd } = ajustarLineal(logX, logY);
+
+    const N = x.length;
+    if (N === 0) return { predict: () => 0, getSlopeAtEnd: () => 0 };
+
+    const sumLogX = logX.reduce((s, v) => s + v, 0);
+    const sumLogY = logY.reduce((s, v) => s + v, 0);
+    const sumLogXLogY = logX.reduce((s, lx, i) => s + lx * logY[i], 0);
+    const sumLogXX = logX.reduce((s, lx) => s + lx * lx, 0);
+
+    const denominator = (N * sumLogXX - sumLogX * sumLogX);
+    let b;
+    let a;
+
+    if (denominator === 0) {
+        b = 0;
+        a = Math.exp(sumLogY / N);
+    } else {
+        b = (N * sumLogXLogY - sumLogX * sumLogY) / denominator;
+        const logA = (sumLogY - b * sumLogX) / N;
+        a = Math.exp(logA);
+    }
+
+    return {
+        predict: t => a * Math.pow(t, b),
+        getSlopeAtEnd: (tEnd = x.length - 1) => {
+            if (isNaN(a) || isNaN(b) || tEnd <= 0) return 0;
+            return a * b * Math.pow(tEnd, b - 1);
+        }
+    };
+}
+
+function ajustarBilineal(x, y) {
+    if (x.length < 4) {
+        console.warn("No hay suficientes datos para ajuste bilineal, ajustando linealmente.");
+        return ajustarLineal(x, y);
+    }
+
+    const mid = Math.floor(x.length / 2);
+
+    const model1 = ajustarLineal(x.slice(0, mid), y.slice(0, mid));
+    const model2 = ajustarLineal(x.slice(mid).map((_, i) => i), y.slice(mid));
+
+    return {
+        predict: t => (t < mid ? model1.predict(t) : model2.predict(t - mid)),
+        getSlopeAtEnd: () => model2.getSlopeAtEnd()
+    };
+}
+
+function toggleGradoPolinomio() {
+    const value = document.getElementById("extrapolationType").value;
+    const gradoInput = document.getElementById("gradoPolinomioContainer");
+    gradoInput.style.display = value === "polinomica" ? "block" : "none";
+
+    if (resumenPromediosGlobal && resumenPromediosGlobal.length > 0) {
+        ejecutarExtrapolacion(resumenPromediosGlobal);
+    }
+}
+
+function ejecutarExtrapolacion(resumenPromedios) {
+    console.log("ejecutarExtrapolacion llamada con (primeros 3 de " + (resumenPromedios ? resumenPromedios.length : 0) + " datos):", resumenPromedios ? resumenPromedios.slice(0, 3) : "");
+
+    if (!resumenPromedios || resumenPromedios.length === 0) {
+        alert("No hay datos base para la extrapolación.");
+        document.getElementById("graficoExtrapolacion").innerHTML = "<p>Extrapolación: Sin datos base.</p>";
+        document.getElementById("tablaExtrapolacion").innerHTML = "";
+        return;
+    }
+
+    const tipo = document.getElementById("extrapolationType").value;
+    const fechaDestinoStr = document.getElementById('extrapolationDate').value;
+    const fechaInicioStr = document.getElementById('startDate').value;
+    const fechaFinStr = document.getElementById('endDate').value;
+    const period = document.getElementById('period').value;
+
+    console.log(`Inputs para extrapolación: Tipo: ${tipo}, Inicio Histórico: ${fechaInicioStr}, Fin Histórico: ${fechaFinStr}, Fecha Extrapolación Deseada: ${fechaDestinoStr}, Periodo: ${period}`);
+
+    if (!fechaDestinoStr || !fechaInicioStr || !fechaFinStr) {
+        alert("Por favor selecciona una fecha de inicio, fin y extrapolación.");
+        return;
+    }
+
+    // Filtrar datos y excluir el último dato
+    let datosFiltrados = resumenPromedios.filter(d => d.time >= fechaInicioStr && d.time <= fechaFinStr);
+
+    console.log(`Datos filtrados para extrapolación (entre ${fechaInicioStr} y ${fechaFinStr}): ${datosFiltrados.length} puntos.`);
+
+    if (datosFiltrados.length < 2) {
+        alert("No hay suficientes datos históricos entre las fechas seleccionadas para ajustar el modelo. Se requieren al menos 2 puntos.");
+        document.getElementById("graficoExtrapolacion").innerHTML = "<p>Extrapolación: Datos insuficientes.</p>";
+        document.getElementById("tablaExtrapolacion").innerHTML = "";
+        return;
+    }
+
+    let ultimaFecha = new Date(fechaFinStr + "T00:00:00Z");
+    const fechaDestino = new Date(fechaDestinoStr + "T00:00:00Z");
+
+    console.log("Fecha histórica final (ultimaFecha obj):", ultimaFecha);
+    console.log("Fecha de extrapolación (fechaDestino obj):", fechaDestino);
+
+    if (isNaN(ultimaFecha.getTime()) || isNaN(fechaDestino.getTime())) {
+        alert("Una de las fechas (fin histórico o extrapolación) es inválida.");
+        return;
+    }
+
+    let pasos = 0;
+    let tempDate = new Date(ultimaFecha);
+    while (tempDate < fechaDestino) {
+        tempDate = addPeriodToDate(new Date(tempDate), period, 1);
+        if (tempDate <= fechaDestino) {
+            pasos++;
+        }
+    }
+    console.log("Número de pasos de extrapolación calculados:", pasos);
+
+    if (pasos <= 0) {
+        alert("La fecha de extrapolación debe ser posterior a la fecha fin de los datos y permitir al menos un paso de extrapolación con el periodo seleccionado.");
+        document.getElementById("graficoExtrapolacion").innerHTML = "<p>Extrapolación: Pasos <=0.</p>";
+        document.getElementById("tablaExtrapolacion").innerHTML = "";
+        return;
+    }
+
+    const variables = ["temperature", "precipitation", "windspeed"];
+    const extrapolationTable = [];
+
+    const variableLimits = {};
+    variables.forEach(variable => {
+        const values = datosFiltrados.map(d => parseFloat(d[variable])).filter(isFinite);
+        if (values.length > 0) {
+            variableLimits[variable] = { min: Math.min(...values), max: Math.max(...values) };
+        } else {
+            variableLimits[variable] = { min: 0, max: 1 };
+        }
+    });
+    console.log("Límites de variables (basado en datos filtrados):", variableLimits);
+
+    const fftResults = {};
+    const sensitivityResults = {};
+    const maxWavelength = Math.floor(datosFiltrados.length / 2);
+    const wavelengthRange = Array.from({ length: Math.max(0, maxWavelength - 1) }, (_, i) => (i + 1) * getPeriodStep(period)).filter(w => w > 0);
+
+    variables.forEach(variable => {
+        const dataFFT = datosFiltrados.map(d => parseFloat(d[variable]));
+        const validDataFFT = dataFFT.filter(isFinite);
+
+        if (validDataFFT.length > 1) {
+            const fft = computeFFT(validDataFFT);
+            fftResults[variable] = { ...fft, wavelengthReal: fft.dominantPeriod * getPeriodStep(period) };
+
+            if (wavelengthRange.length > 0) {
+                sensitivityResults[variable] = sensitivityAnalysis(validDataFFT, (s, wavelength) => {
+                    const N_sens = validDataFFT.length;
+                    const C_sens = validDataFFT.reduce((sum, val) => sum + val, 0) / N_sens;
+                    const A_est_sens = (Math.max(...validDataFFT) - Math.min(...validDataFFT)) / 2;
+                    const omega_sens = (2 * Math.PI) / wavelength;
+                    return A_est_sens * Math.sin(omega_sens * (s * getPeriodStep(period))) + C_sens;
+                });
+            } else {
+                sensitivityResults[variable] = [];
+            }
+        } else {
+            fftResults[variable] = { dominantPeriod: NaN, wavelength: NaN, wavelengthReal: NaN, peakMagnitude: NaN, peakFrequency: NaN };
+            sensitivityResults[variable] = [];
+        }
+    });
+
+    switch (tipo) {
+        case "lineal":
+        case "bilineal":
+        case "logaritmica":
+        case "sinodal":
+        case "potencia":
+        case "polinomica":
+            {
+                variables.forEach(variable => {
+                    const y = datosFiltrados.map(d => parseFloat(d[variable]));
+                    const x = Array.from({ length: y.length }, (_, i) => i);
+
+                    let modelWrapper;
+                    if (tipo === "lineal") modelWrapper = ajustarLineal(x, y);
+                    else if (tipo === "bilineal") modelWrapper = ajustarBilineal(x, y);
+                    else if (tipo === "logaritmica") modelWrapper = ajustarLogaritmica(x, y);
+                    else if (tipo === "sinodal") {
+                        const dominantWavelength = fftResults[variable] ? fftResults[variable].wavelengthReal : undefined;
+                        modelWrapper = ajustarSinusoidal(x, y, dominantWavelength, period);
+                    } else if (tipo === "potencia") modelWrapper = ajustarPotencia(x, y);
+                    else if (tipo === "polinomica") {
+                        const grado = parseInt(document.getElementById("gradoPolinomio").value) || 3;
+                        modelWrapper = ajustarPolinomio(x, y, grado);
+                    }
+
+                    if (!modelWrapper) {
+                        console.error("No se pudo crear modelo para", variable);
+                        return;
+                    }
+
+                    const lastHistoricalT = x.length - 1;
+                    const lastHistoricalValue = modelWrapper.predict(lastHistoricalT);
+                    const slopeAtEnd = modelWrapper.getSlopeAtEnd(lastHistoricalT);
+
+                    const minVal = variableLimits[variable].min;
+                    const maxVal = variableLimits[variable].max;
+
+                    for (let i = 1; i <= pasos; i++) {
+                        const currentExtrapolationT = lastHistoricalT + i;
+                        let pred;
+
+                        if (tipo === "sinodal" || tipo === "logaritmica" || tipo === "potencia" || tipo === "polinomica" || tipo === "bilineal") {
+                            pred = modelWrapper.predict(currentExtrapolationT);
+                        } else {
+                            pred = lastHistoricalValue + (i * slopeAtEnd);
+                        }
+
+                        pred = clipValue(pred, minVal, maxVal);
+
+                        if (!extrapolationTable[i - 1]) {
+                            const fechaExtrapolada = addPeriodToDate(new Date(ultimaFecha), period, i);
+                            const fechaStr = period === "hora" ? fechaExtrapolada.toISOString().slice(0, 13) + ':00' : fechaExtrapolada.toISOString().slice(0, 10);
+                            extrapolationTable[i - 1] = { time: fechaStr };
+                        }
+                        extrapolationTable[i - 1][variable] = (typeof pred === 'number' && isFinite(pred)) ? pred.toFixed(3) : '';
+                    }
+                });
+                break;
+            }
+        case "multivariante":
+            try {
+                ejecutarVAR(datosFiltrados, pasos, ultimaFecha, variableLimits);
+            } catch (e) {
+                alert("Error en VAR: " + e.message);
+                console.error("Error en VAR:", e);
+                document.getElementById("graficoExtrapolacion").innerHTML = "<p>Error en VAR</p>";
+                document.getElementById("tablaExtrapolacion").innerHTML = "<p>Error en VAR</p>";
+            }
+            return;
+        default:
+            alert("Tipo de extrapolación no soportado.");
+            return;
+    }
+
+    const xReal = datosFiltrados.map(d => d.time);
+    const xPred = extrapolationTable.map(d => d.time);
+    const plotXAxis = xReal.concat(xPred);
+
+    const traceTemp = {
+        x: plotXAxis,
+        y: datosFiltrados.map(d => parseFloat(d.temperature)).concat(extrapolationTable.map(d => parseFloat(d.temperature))),
+        mode: 'lines+markers',
+        name: 'Temperatura (norm)',
+        yaxis: 'y1',
+        line: { color: 'red' }
+    };
+    const tracePrec = {
+        x: plotXAxis,
+        y: datosFiltrados.map(d => parseFloat(d.precipitation)).concat(extrapolationTable.map(d => parseFloat(d.precipitation))),
+        mode: 'lines+markers',
+        name: 'Precipitación (norm)',
+        yaxis: 'y2',
+        line: { color: 'blue' }
+    };
+    const traceWind = {
+        x: plotXAxis,
+        y: datosFiltrados.map(d => parseFloat(d.windspeed)).concat(extrapolationTable.map(d => parseFloat(d.windspeed))),
+        mode: 'lines+markers',
+        name: 'Viento (norm)',
+        yaxis: 'y3',
+        line: { color: 'green' }
+    };
+
+    const layout = {
+        title: `Extrapolación (${tipo}) - Valores Normalizados (0-1)`,
+        xaxis: { title: 'Fecha', tickangle: -45 },
+        yaxis: { title: 'Temperatura (0-1)', titlefont: { color: 'red' }, tickfont: { color: 'red' }, range: [0, 1] },
+        yaxis2: { title: 'Precipitación (0-1)', titlefont: { color: 'blue' }, tickfont: { color: 'blue' }, overlaying: 'y', side: 'right', anchor: 'x', position: 1, range: [0, 1] },
+        yaxis3: { title: 'Viento (0-1)', titlefont: { color: 'green' }, tickfont: { color: 'green' }, overlaying: 'y', side: 'right', anchor: 'free', position: 1.1, showgrid: false },
+        margin: { t: 50, r: 120, b: 100 },
+        legend: { x: 1.25, xanchor: 'left', y: 1 }
+    };
+
+    Plotly.newPlot('graficoExtrapolacion', [traceTemp, tracePrec, traceWind], layout);
+}
+
+function ejecutarVAR(datosEntradaVAR, pasosExtrapolacion, ultimaFechaHistorica, limitesVariables) {
+    console.log("Ejecutando VAR con datos:", datosEntradaVAR, "Pasos:", pasosExtrapolacion, "UltimaFecha:", ultimaFechaHistorica);
+
+    const period = document.getElementById('period').value;
+
+    const resumenParaZscore = datosEntradaVAR.map(d => ({
+        temperature: parseFloat(d.temperature),
+        precipitation: parseFloat(d.precipitation),
+        windspeed: parseFloat(d.windspeed)
+    }));
+
+    const normalizedZ = normalizeDataZ(resumenParaZscore);
+
+    const dataMatrix = normalizedZ.map(d => [d.temperature, d.precipitation, d.windspeed]);
+
+    if (dataMatrix.some(row => row.some(val => isNaN(val)))) {
+        console.error("Error: datos con NaN en VAR después de la normalización Z. Revise los datos de entrada o la función normalizeDataZ.", dataMatrix.slice(0, 5));
+        alert("Error: Datos inválidos (NaN) en la normalización Z para VAR. No se puede ejecutar el modelo.");
+        return;
+    }
+
+    const corrMatrix = calculateCorrelationMatrix(normalizedZ);
+    console.log("Matriz de correlación (sobre datos normalizados Z-score):", corrMatrix);
+
+    const p = 3;
+
+    if (dataMatrix.length <= p) {
+        alert(`No hay suficientes datos (${dataMatrix.length}) para ajustar un modelo VAR de orden ${p}. Se requieren al menos ${p + 1} puntos de datos.`);
+        document.getElementById("graficoExtrapolacion").innerHTML = `<p>No hay suficientes datos para VAR (se requieren ${p + 1} puntos).</p>`;
+        document.getElementById("tablaExtrapolacion").innerHTML = "";
+        return;
+    }
+
+    let modelVAR;
+    try {
+        modelVAR = fitVAR(dataMatrix, p);
+        console.log("Coeficientes del modelo VAR:", modelVAR);
+    } catch (e) {
+        alert(`Error al ajustar el modelo VAR: ${e.message}`);
+        console.error("Error al ajustar el modelo VAR:", e);
+        document.getElementById("graficoExtrapolacion").innerHTML = `<p>Error al ajustar el modelo VAR</p>`;
+        document.getElementById("tablaExtrapolacion").innerHTML = `<p>Error al ajustar el modelo VAR</p>`;
+        return;
+    }
+
+    validateModel(dataMatrix, modelVAR, p);
+
+    let predictionsZ = predictVAR(modelVAR, dataMatrix, p, pasosExtrapolacion);
+
+    const vars = ['temperature', 'precipitation', 'windspeed'];
+    const means = {};
+    const stds = {};
+
+    vars.forEach(v => {
+        const values = datosEntradaVAR.map(d => parseFloat(d[v])).filter(isFinite);
+        if (values.length > 0) {
+            means[v] = values.reduce((a, b) => a + b, 0) / values.length;
+            if (values.length > 1) {
+                stds[v] = Math.sqrt(values.reduce((a, b) => a + Math.pow(b - means[v], 2), 0) / (values.length - 1));
+            } else {
+                stds[v] = 0;
+            }
+        } else {
+            means[v] = 0;
+            stds[v] = 1;
+        }
+    });
+
+    function processPredictions(predictionsZ, means, stds, limitesVariables, period, ultimaFechaHistorica, datosEntradaVAR) {
+        for (let v in stds) {
+            if (!stds[v] || stds[v] === 0) stds[v] = 1e-6;
+        }
+        const predictionsBack = predictionsZ.map(row => {
+            const res = [];
+            res[0] = row[0] * stds.temperature + means.temperature;
+            res[1] = row[1] * stds.precipitation + means.precipitation;
+            res[2] = row[2] * stds.windspeed + means.windspeed;
+            res[0] = clipValue(res[0], limitesVariables.temperature.min, limitesVariables.temperature.max);
+            res[1] = clipValue(res[1], limitesVariables.precipitation.min, limitesVariables.precipitation.max);
+            res[2] = clipValue(res[2], limitesVariables.windspeed.min, limitesVariables.windspeed.max);
+            return res;
+        });
+
+        const extrapolationTable = predictionsBack.map((p, i) => {
+            const fechaExtrapolada = addPeriodToDate(new Date(ultimaFechaHistorica), period, i + 1);
+            const fechaStr = period === 'hora'
+                ? fechaExtrapolada.toISOString().slice(0, 13) + ':00'
+                : fechaExtrapolada.toISOString().slice(0, 10);
+            return {
+                time: fechaStr,
+                temperature: typeof p[0] === 'number' ? p[0].toFixed(3) : '',
+                precipitation: typeof p[1] === 'number' ? p[1].toFixed(3) : '',
+                windspeed: typeof p[2] === 'number' ? p[2].toFixed(3) : ''
+            };
+        });
+
+        plotResultsVAR(datosEntradaVAR, extrapolationTable, ultimaFechaHistorica, period);
+        renderTable("tablaExtrapolacion", ["time", "temperature", "precipitation", "windspeed"], extrapolationTable);
+    }
+
+    processPredictions(predictionsZ, means, stds, limitesVariables, period, ultimaFechaHistorica, datosEntradaVAR);
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    initializeMap();
+
+    document.getElementById("extrapolationType").addEventListener("change", toggleGradoPolinomio);
+
+    const form = document.getElementById("weatherForm");
+    if (form) {
+        form.addEventListener("submit", async function (event) {
+            event.preventDefault();
+            try {
+                const lat = selectedLat;
+                const lon = selectedLon;
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                const period = document.getElementById('period').value;
+
+                if (!lat || !lon || !startDate || !endDate) {
+                    alert("Selecciona ubicación y fechas.");
+                    return;
+                }
+
+                let eraData = [];
+                try {
+                    const eraUrl = `https://archive-api.open-meteo.com/v1/era5?latitude=${lat}&longitude=${lon}&start_date=${startDate}&end_date=${endDate}&hourly=temperature_2m,precipitation,windspeed_10m`;
+                    const res = await fetch(eraUrl);
+                    const data = await res.json();
+                    if (data.hourly && data.hourly.time) {
+                        eraData = data.hourly.time.map((t, i) => ({
+                            time: t,
+                            temperature: data.hourly.temperature_2m[i],
+                            precipitation: data.hourly.precipitation[i],
+                            windspeed: data.hourly.windspeed_10m[i]
+                        }));
+                    }
+                } catch (e) {
+                    console.error("Error consultando ERA5:", e);
+                }
+
+                let nasaData = [];
+                try {
+                    const nasaParams = "T2M,PRECTOTCORR,WS2M";
+                    const startDateFormatted = startDate.replace(/-/g, '');
+                    const endDateFormatted = endDate.replace(/-/g, '');
+                    const nasaUrl = `https://corsproxy.io/?https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=${nasaParams}&community=ag&longitude=${lon}&latitude=${lat}&start=${startDateFormatted}&end=${endDateFormatted}&format=JSON`;
+                    const res = await fetch(nasaUrl);
+                    const data = await res.json();
+                    const params = data?.properties?.parameter;
+                    if (params && params.T2M) {
+                        nasaData = Object.keys(params.T2M).map(key => ({
+                            time: `${key.slice(0,4)}-${key.slice(4,6)}-${key.slice(6,8)}T${key.slice(8,10)}:00`,
+                            temperature: isFinite(params.T2M[key]) ? Number(params.T2M[key]) : null,
+                            precipitation: isFinite(params.PRECTOTCORR[key]) ? Number(params.PRECTOTCORR[key]) : null,
+                            windspeed: isFinite(params.WS2M[key]) ? Number(params.WS2M[key]) : null
+                        })).filter(row => row.temperature !== null && row.precipitation !== null && row.windspeed !== null);
+                    }
+                } catch (e) {
+                    console.error("Error consultando NASA POWER:", e);
+                }
+
+                let eraToRender = eraData;
+                let nasaToRender = nasaData;
+                const headers = ["time", "temperature", "precipitation", "windspeed"];
+                if (period !== "hora") {
+                    eraToRender = groupByPeriodAverage(eraData, headers.slice(1), period);
+                    nasaToRender = groupByPeriodAverage(nasaData, headers.slice(1), period);
+                }
+
+                renderTable("era5Table", headers, eraToRender);
+                renderTable("nasaTable", headers, nasaToRender);
+                plotDataEra5(eraToRender);
+                plotDataNasa(nasaToRender);
+
+                let resumen = [];
+                if (eraToRender.length > 0 && nasaToRender.length > 0) {
+                    resumen = eraToRender.map((row, idx) => {
+                        const nasaRow = nasaToRender.find(n => n.time === row.time);
+                        if (nasaRow) {
+                            return {
+                                time: row.time,
+                                temperature: calcularPromedios([row], [nasaRow], 'temperature')[idx],
+                                precipitation: calcularPromedios([row], [nasaRow], 'precipitation')[idx],
+                                windspeed: calcularPromedios([row], [nasaRow], 'windspeed')[idx]
+                            };
+                        }
+                        return row;
+                    });
+                } else if (eraToRender.length > 0) {
+                    resumen = eraToRender;
+                } else if (nasaToRender.length > 0) {
+                    resumen = nasaToRender;
+                } else {
+                    alert("No se obtuvieron datos de ERA5 ni NASA POWER.");
+                    return;
+                }
+
+                resumen = normalizeData(resumen, ["temperature", "precipitation", "windspeed"]);
+                resumenPromediosGlobal = resumen;
+                renderTable("tablaPromedios", headers, resumen);
+
+                plotComparisonNormalized(eraToRender, nasaToRender);
+
+                await ejecutarExtrapolacion(resumenPromediosGlobal);
+
+            } catch (error) {
+                console.error('Error en consulta climática:', error);
+                alert('Ocurrió un error inesperado. Consulta la consola para más detalles.');
+            }
+        });
+    }
+});
+
+</script>
+</body>
+</html>
